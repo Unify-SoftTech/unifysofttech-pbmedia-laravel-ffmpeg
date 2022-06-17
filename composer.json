@@ -1,0 +1,74 @@
+{
+    "name": "unifysofttech-pbmedia/laravel-ffmpeg",
+    "description": "FFMpeg for Laravel",
+    "keywords": [
+        "pbmedia",
+        "laravel",
+        "laravel-ffmpeg",
+        "ffmpeg",
+        "protonemedia",
+        "protone media",
+        "pascal baljet media",
+        "pascalbaljetmedia",
+        "unifysofttech-pbmedia"
+    ],
+    "homepage": "https://github.com/pascalbaljetmedia/laravel-ffmpeg",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Pascal Baljet",
+            "email": "pascal@protone.media",
+            "homepage": "https://protone.media",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.3|^8.0",
+        "evenement/evenement": "^3.0",
+        "league/flysystem": "^1.0.34",
+        "illuminate/bus": "^6.0|^7.0|^8.0",
+        "illuminate/config": "^6.0|^7.0|^8.0",
+        "illuminate/filesystem": "^6.0|^7.0|^8.0",
+        "illuminate/log": "^6.0|^7.0|^8.0",
+        "illuminate/support": "^6.0|^7.0|^8.0",
+        "unifysofttech/php-ffmpeg": "^1.1"
+    },
+    "require-dev": {
+        "league/flysystem-memory": "^1.0",
+        "mockery/mockery": "^1.3.3",
+        "orchestra/testbench": "^4.0|^5.0|^6.0",
+        "phpunit/phpunit": "^8.0|9.4.*",
+        "spatie/image": "^1.7",
+        "twistor/flysystem-http": "^0.2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ProtoneMedia\\LaravelFFMpeg\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ProtoneMedia\\LaravelFFMpeg\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "extra": {
+        "laravel": {
+            "providers": [
+                "ProtoneMedia\\LaravelFFMpeg\\Support\\ServiceProvider"
+            ],
+            "aliases": {
+                "FFMpeg": "ProtoneMedia\\LaravelFFMpeg\\Support\\FFMpeg"
+            }
+        }
+    }
+}
