@@ -8,7 +8,6 @@ use FFMpeg\FFProbe;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 use ProtoneMedia\LaravelFFMpeg\Drivers\PHPFFMpeg;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\TemporaryDirectories;
-use Psr\Log\LoggerInterface;
 
 class ServiceProvider extends BaseServiceProvider
 {
@@ -33,20 +32,35 @@ class ServiceProvider extends BaseServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../../config/config.php', 'laravel-ffmpeg');
 
         $this->app->singleton('laravel-ffmpeg-logger', function () {
-            return $this->app['config']->get('laravel-ffmpeg.enable_logging', true)
-                ? app(LoggerInterface::class)
-                : null;
+            $logChannel = $this->app['config']->get('laravel-ffmpeg.log_channel');
+
+            if ($logChannel === false) {
+                return null;
+            }
+
+            return $this->app['log']->channel($logChannel ?: $this->app['config']->get('logging.default'));
         });
 
         $this->app->singleton('laravel-ffmpeg-configuration', function () {
             $config = $this->app['config'];
 
-            return [
+            $baseConfig = [
                 'ffmpeg.binaries'  => $config->get('laravel-ffmpeg.ffmpeg.binaries'),
-                'ffmpeg.threads'   => $config->get('laravel-ffmpeg.ffmpeg.threads', 12),
                 'ffprobe.binaries' => $config->get('laravel-ffmpeg.ffprobe.binaries'),
                 'timeout'          => $config->get('laravel-ffmpeg.timeout'),
             ];
+
+            $configuredThreads = $config->get('laravel-ffmpeg.ffmpeg.threads', 12);
+
+            if ($configuredThreads !== false) {
+                $baseConfig['ffmpeg.threads'] = $configuredThreads;
+            }
+
+            if ($configuredTemporaryRoot = $config->get('laravel-ffmpeg.temporary_files_root')) {
+                $baseConfig['temporary_directory'] = $configuredTemporaryRoot;
+            }
+
+            return $baseConfig;
         });
 
         $this->app->singleton(FFProbe::class, function () {
@@ -84,7 +98,8 @@ class ServiceProvider extends BaseServiceProvider
         $this->app->singleton('laravel-ffmpeg', function () {
             return new MediaOpenerFactory(
                 $this->app['config']->get('filesystems.default'),
-                $this->app->make(PHPFFMpeg::class)
+                null,
+                fn () => $this->app->make(PHPFFMpeg::class)
             );
         });
     }

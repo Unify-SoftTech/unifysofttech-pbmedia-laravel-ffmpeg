@@ -20,7 +20,7 @@ trait InteractsWithMediaStreams
             return iterator_to_array($this->media->getStreams());
         }
 
-        return $this->mediaCollection->map(function (Media $media) {
+        return $this->mediaCollection->map(function ($media) {
             return $this->fresh()->open(MediaCollection::make([$media]))->getStreams();
         })->collapse()->all();
     }
@@ -33,14 +33,16 @@ trait InteractsWithMediaStreams
         $stream = Arr::first($this->getStreams());
 
         if ($stream->has('duration')) {
-            return $stream->get('duration') * 1000;
+            return intval(round($stream->get('duration') * 1000));
         }
 
         $format = $this->getFormat();
 
         if ($format->has('duration')) {
-            return $format->get('duration') * 1000;
+            return intval(round($format->get('duration') * 1000));
         }
+
+        throw new UnknownDurationException('Could not determine the duration of the media.');
     }
 
     public function getDurationInSeconds(): int

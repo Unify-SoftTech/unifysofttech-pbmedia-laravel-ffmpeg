@@ -14,23 +14,23 @@ class EncodingException extends RuntimeException
             $runtimeException->getCode(),
             $runtimeException->getPrevious()
         ), function (self $exception) {
-            if (config('laravel-ffmpeg.set_command_and_error_output_on_exception')) {
-                $exception->message = $exception->getAlchemyException()->getMessage();
+            if (config('laravel-ffmpeg.set_command_and_error_output_on_exception', true)) {
+                $exception->message = $exception->getAlchemyException()?->getMessage() ?: "";
             }
         });
     }
 
-    public function getCommand(): string
+    public function getCommand(): ?string
     {
-        return $this->getAlchemyException()->getCommand();
+        return $this->getAlchemyException()?->getCommand();
     }
 
-    public function getErrorOutput(): string
+    public function getErrorOutput(): ?string
     {
-        return $this->getAlchemyException()->getErrorOutput();
+        return $this->getAlchemyException()?->getErrorOutput();
     }
 
-    public function getAlchemyException(): ExecutionFailureException
+    public function getAlchemyException(): ?ExecutionFailureException
     {
         return $this->getPrevious();
     }

@@ -5,17 +5,21 @@ namespace ProtoneMedia\LaravelFFMpeg;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\Media\AbstractMediaType;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Filesystem\FilesystemManager;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Traits\ForwardsCalls;
 use ProtoneMedia\LaravelFFMpeg\Drivers\PHPFFMpeg;
 use ProtoneMedia\LaravelFFMpeg\Exporters\HLSExporter;
 use ProtoneMedia\LaravelFFMpeg\Exporters\MediaExporter;
+use ProtoneMedia\LaravelFFMpeg\FFMpeg\ImageFormat;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\Disk;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\Media;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\MediaCollection;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\MediaOnNetwork;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\TemporaryDirectories;
+use ProtoneMedia\LaravelFFMpeg\Filters\TileFactory;
 
 /**
  * @mixin \ProtoneMedia\LaravelFFMpeg\Drivers\PHPFFMpeg
@@ -55,7 +59,7 @@ class MediaOpener
 
         $this->driver = ($driver ?: app(PHPFFMpeg::class))->fresh();
 
-        $this->collection = $mediaCollection ?: new MediaCollection;
+        $this->collection = $mediaCollection ?: new MediaCollection();
     }
 
     public function clone(): self
@@ -85,13 +89,30 @@ class MediaOpener
         return $this->fromDisk($filesystem);
     }
 
+    private static function makeLocalDiskFromPath(string $path): Disk
+    {
+        $adapter = (new FilesystemManager(app()))->createLocalDriver([
+            'root' => $path,
+        ]);
+
+        return Disk::make($adapter);
+    }
+
     /**
      * Instantiates a Media object for each given path.
      */
     public function open($paths): self
     {
         foreach (Arr::wrap($paths) as $path) {
-            $this->collection->push(Media::make($this->disk, $path));
+            if ($path instanceof UploadedFile) {
+                $disk = static::makeLocalDiskFromPath($path->getPath());
+
+                $media = Media::make($disk, $path->getFilename());
+            } else {
+                $media = Media::make($this->disk, $path);
+            }
+
+            $this->collection->push($media);
         }
 
         return $this;
@@ -184,6 +205,34 @@ class MediaOpener
     public function exportForHLS(): HLSExporter
     {
         return new HLSExporter($this->getAdvancedDriver());
+    }
+
+    /**
+     * Returns an instance of MediaExporter with a TileFilter and ImageFormat.
+     */
+    public function exportTile(callable $withTileFactory): MediaExporter
+    {
+        return $this->export()
+            ->addTileFilter($withTileFactory)
+            ->inFormat(new ImageFormat());
+    }
+
+    public function exportFramesByAmount(int $amount, int $width = null, int $height = null, int $quality = null): MediaExporter
+    {
+        $interval = ($this->getDurationInSeconds() + 1) / $amount;
+
+        return $this->exportFramesByInterval($interval, $width, $height, $quality);
+    }
+
+    public function exportFramesByInterval(float $interval, int $width = null, int $height = null, int $quality = null): MediaExporter
+    {
+        return $this->exportTile(
+            fn (TileFactory $tileFactory) => $tileFactory
+                ->interval($interval)
+                ->grid(1, 1)
+                ->scale($width, $height)
+                ->quality($quality)
+        );
     }
 
     public function cleanupTemporaryFiles(): self

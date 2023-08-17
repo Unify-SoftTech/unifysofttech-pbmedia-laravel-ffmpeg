@@ -11,6 +11,7 @@ use ProtoneMedia\LaravelFFMpeg\FFMpeg\NullFormat;
 use ProtoneMedia\LaravelFFMpeg\FFMpeg\StdListener;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\Disk;
 use ProtoneMedia\LaravelFFMpeg\Filesystem\Media;
+use ProtoneMedia\LaravelFFMpeg\Filters\TileFactory;
 use ProtoneMedia\LaravelFFMpeg\MediaOpener;
 use ProtoneMedia\LaravelFFMpeg\Support\ProcessOutput;
 
@@ -19,12 +20,12 @@ use ProtoneMedia\LaravelFFMpeg\Support\ProcessOutput;
  */
 class MediaExporter
 {
-    use ForwardsCalls,
-        HandlesAdvancedMedia,
-        HandlesConcatenation,
-        HandlesFrames,
-        HandlesTimelapse,
-        HasProgressListener;
+    use ForwardsCalls;
+    use HandlesAdvancedMedia;
+    use HandlesConcatenation;
+    use HandlesFrames;
+    use HandlesTimelapse;
+    use HasProgressListener;
 
     /**
      * @var \ProtoneMedia\LaravelFFMpeg\Drivers\PHPFFMpeg
@@ -46,11 +47,19 @@ class MediaExporter
      */
     private $toDisk;
 
+    /**
+     * Callbacks that should be called directly after the
+     * underlying library completed the save method.
+     *
+     * @var array
+     */
+    private $afterSavingCallbacks = [];
+
     public function __construct(PHPFFMpeg $driver)
     {
         $this->driver = $driver;
 
-        $this->maps = new Collection;
+        $this->maps = new Collection();
     }
 
     protected function getDisk(): Disk
@@ -61,7 +70,10 @@ class MediaExporter
 
         $media = $this->driver->getMediaCollection();
 
-        return $this->toDisk = $media->first()->getDisk();
+        /** @var Disk $disk */
+        $disk = $media->first()->getDisk();
+
+        return $this->toDisk = $disk->clone();
     }
 
     public function inFormat(FormatInterface $format): self
@@ -86,6 +98,36 @@ class MediaExporter
     }
 
     /**
+     * Calls the callable with a TileFactory instance and
+     * adds the freshly generated TileFilter.
+     *
+     * @param callable $withTileFactory
+     * @return self
+     */
+    public function addTileFilter(callable $withTileFactory): self
+    {
+        $withTileFactory(
+            $tileFactory = new TileFactory()
+        );
+
+        $this->addFilter($filter = $tileFactory->get());
+
+        if (!$tileFactory->vttOutputPath) {
+            return $this;
+        }
+
+        return $this->afterSaving(function (MediaExporter $mediaExporter, Media $outputMedia) use ($filter, $tileFactory) {
+            $generator = new VTTPreviewThumbnailsGenerator(
+                $filter,
+                $mediaExporter->driver->getDurationInSeconds(),
+                $tileFactory->vttSequnceFilename ?: fn () => $outputMedia->getPath()
+            );
+
+            $this->toDisk->put($tileFactory->vttOutputPath, $generator->getContents());
+        });
+    }
+
+    /**
      * Returns the final command, useful for debugging purposes.
      *
      * @param string $path
@@ -96,7 +138,7 @@ class MediaExporter
         $media = $this->prepareSaving($path);
 
         return $this->driver->getFinalCommand(
-            $this->format ?: new NullFormat,
+            $this->format ?: new NullFormat(),
             optional($media)->getLocalPath() ?: '/dev/null'
         );
     }
@@ -110,6 +152,19 @@ class MediaExporter
     public function dd(string $path = null)
     {
         dd($this->getCommand($path));
+    }
+
+    /**
+     * Adds a callable to the callbacks array.
+     *
+     * @param callable $callback
+     * @return self
+     */
+    public function afterSaving(callable $callback): self
+    {
+        $this->afterSavingCallbacks[] = $callback;
+
+        return $this;
     }
 
     private function prepareSaving(string $path = null): ?Media
@@ -139,6 +194,15 @@ class MediaExporter
         return $outputMedia;
     }
 
+    protected function runAfterSavingCallbacks(Media $outputMedia = null)
+    {
+        foreach ($this->afterSavingCallbacks as $key => $callback) {
+            call_user_func($callback, $this, $outputMedia);
+
+            unset($this->afterSavingCallbacks[$key]);
+        }
+    }
+
     public function save(string $path = null)
     {
         $outputMedia = $this->prepareSaving($path);
@@ -160,11 +224,12 @@ class MediaExporter
                 );
 
                 if ($this->returnFrameContents) {
+                    $this->runAfterSavingCallbacks($outputMedia);
                     return $data;
                 }
             } else {
                 $this->driver->save(
-                    $this->format ?: new NullFormat,
+                    $this->format ?: new NullFormat(),
                     optional($outputMedia)->getLocalPath() ?: '/dev/null'
                 );
             }
@@ -181,12 +246,14 @@ class MediaExporter
             call_user_func($this->onProgressCallback, 100, 0, 0);
         }
 
+        $this->runAfterSavingCallbacks($outputMedia);
+
         return $this->getMediaOpener();
     }
 
     public function getProcessOutput(): ProcessOutput
     {
-        return tap(new StdListener, function (StdListener $listener) {
+        return tap(new StdListener(), function (StdListener $listener) {
             $this->addListener($listener)->save();
             $listener->removeAllListeners();
             $this->removeListener($listener);
@@ -206,7 +273,7 @@ class MediaExporter
         }
 
         if ($this->onProgressCallback) {
-            call_user_func($this->onProgressCallback, 100);
+            call_user_func($this->onProgressCallback, 100, 0, 0);
         }
 
         $this->maps->map->getOutputMedia()->each->copyAllFromTemporaryDirectory($this->visibility);

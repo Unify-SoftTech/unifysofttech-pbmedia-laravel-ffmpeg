@@ -2,6 +2,87 @@
 
 All Notable changes to `pbmedia/laravel-ffmpeg` will be documented in this file
 
+## 8.1.2 - 2022-05-23
+
+-   Don't resolve driver until needed.
+
+## 8.1.1 - 2022-05-13
+
+-   Bugfix for parsing the average frame rate.
+
+## 8.1.0 - 2022-05-12
+
+-   You may now specify a separate temporary disk for processing HLS exports.
+
+## 8.0.2 - 2022-05-12
+
+-   Fix for getting the previous exception while it doesn't exist.
+
+## 8.0.1 - 2022-02-22
+
+-   The configured temporary directory is now passed to the underlying driver.
+
+## 8.0.0 - 2022-02-10
+
+Support for Laravel 9, dropped support for Laravel 8 and earlier.
+
+### Upgrading to v8
+
+* As Laravel 9 has migrated from [Flysystem 1.x to 3.x](https://laravel.com/docs/9.x/upgrade#flysystem-3), this version is not compatible with Laravel 8 or earlier.
+* If you're using the [Watermark manipulation](#watermark-manipulation) feature, make sure you upgrade [`spatie/image`](https://github.com/spatie/image) to v2.
+* The `set_command_and_error_output_on_exception` configuration key now defaults to `true`, making exceptions more informative. Read more at the [Handling exceptions](#handling-exceptions) section.
+* The `enable_logging` configuration key has been replaced by `log_channel` to choose the log channel used when writing messages to the logs. If you still want to disable logging entirely, you may set the new configuration key to `false`.
+* The *segment length* and *keyframe interval* of [HLS exports](#HLS) should be `2` or more; less is not supported anymore.
+
+## 7.8.1 - 2022-02-10
+
+### Added
+
+-   Support for opening uploaded files
+
+## 7.8.0 - 2022-02-09
+
+### Added
+
+-   Support for the [modernized php-ffmpeg release](https://github.com/PHP-FFMpeg/PHP-FFMpeg/releases/tag/v1.0.0)
+
+## 7.7.3 - 2022-02-07
+
+### Added
+
+-   Abilty to disable the threads filter from the config (thanks @ibrainventures)
+
+## 7.7.2 - 2021-01-12
+
+### Fixed
+
+-   Fix for getting the duration of a file opened with the `openUrl` method.
+
+## 7.7.1 - 2021-01-03
+
+### Fixed
+
+-   Fix for missing `$remaining` and `$rate` values when using the progress handler on exports with multiple inputs/outputs.
+
+## 7.7.0 - 2021-12-31
+
+### Added
+
+-   Added Tile filter and factory
+-   Support for exporting frames using the Tile filter
+-   Bugfix for exporting loops using external disks
+
+## 7.6.0 - 2021-12-20
+
+### Added
+
+-   Support for PHP 8.1
+
+### Removed
+
+-   Support for PHP 7.3
+-   Support for Laravel 6 and 7
+
 ## 7.5.12 - 2021-07-05
 
 ### Added
